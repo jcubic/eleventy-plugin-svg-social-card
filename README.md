@@ -1,5 +1,9 @@
 # eleventy-plugin-svg-social-card
 
+[![npm](https://img.shields.io/badge/npm-0.1.0-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
+[![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
+[![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
+
 Generate per-page social card images (Open Graph / Twitter card) for your
 Eleventy site from an SVG template, rendered via a headless browser.
 
