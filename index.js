@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Liquid } from 'liquidjs';
-import { chromium } from 'playwright';
+import puppeteer from 'puppeteer';
 
 const liquid = new Liquid();
 
@@ -64,7 +64,10 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             browser = await options.browser();
             ownBrowser = false;
         } else {
-            browser = await chromium.launch({ args: ['--no-sandbox'] });
+            browser = await puppeteer.launch({
+                headless: 'new',
+                args: ['--no-sandbox'],
+            });
             ownBrowser = true;
         }
     });
@@ -100,8 +103,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(tmpSvg, rendered);
 
-        const browserPage = await browser.newPage({ viewport: options.viewport });
+        const browserPage = await browser.newPage();
         try {
+            await browserPage.setViewport(options.viewport);
             await browserPage.goto('file://' + tmpSvg);
             if (options.delay > 0) {
                 await delay(options.delay);

@@ -1,9 +1,9 @@
+{%- capture cardUrl -%}{% socialCard %}{%- endcapture -%}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <title>{{ title }}</title>
-  {% assign cardUrl = socialCard %}
   <meta property="og:title" content="{{ title }}"/>
   <meta property="og:image" content="{{ cardUrl }}"/>
   <meta property="og:image:width"  content="1200"/>
