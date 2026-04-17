@@ -40,6 +40,34 @@ function prefix(suffix) {
     return `[eleventy-plugin-svg-social-card] ${suffix}`;
 }
 
+// Inkscape URL-encodes curly braces inside attribute values on save, turning
+// `{{ name }}` into `%7B%7B%20name%20%7D%7D`. The SVG is still valid XML, so
+// xmllint-wasm doesn't flag it, but Liquid never sees a placeholder and the
+// attribute renders as a literal URL-encoded string. Warn loudly so the user
+// can un-escape it in a text editor.
+function warnOnUrlEncodedBraces(src, templatePath, cardName) {
+    const pattern = /%7B%7B|%7D%7D/gi;
+    if (!pattern.test(src)) return;
+
+    const lines = src.split('\n');
+    const affected = new Set();
+    for (let i = 0; i < lines.length; i++) {
+        if (/%7B%7B|%7D%7D/i.test(lines[i])) {
+            affected.add(i + 1);
+        }
+    }
+
+    const label = cardName ? `card "${cardName}" (${templatePath})` : templatePath;
+    console.warn(prefix(
+        `WARNING: ${label} contains URL-encoded Liquid placeholders on ` +
+        `line(s) ${[...affected].join(', ')}. This usually happens when ` +
+        `Inkscape saves {{ ... }} inside an attribute (xlink:href, href, etc.). ` +
+        `Replace "%7B%7B%20" with "{{ " and "%20%7D%7D" with " }}" in a text ` +
+        `editor to restore templating — otherwise the rendered card will ` +
+        `contain the literal encoded string.`
+    ));
+}
+
 export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     const shortcodeName = userOptions.shortcode ?? 'card';
     const isMulti = userOptions.cards != null;
@@ -78,6 +106,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     eleventyConfig.on('eleventy.before', async () => {
         for (const [name, v] of Object.entries(variants)) {
             const src = await fs.readFile(v.template, 'utf8');
+
+            warnOnUrlEncodedBraces(src, v.template, isMulti ? name : null);
+
             v.parsed = liquid.parse(src);
 
             const probe = await liquid.render(v.parsed, {});
