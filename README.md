@@ -1,6 +1,6 @@
 # eleventy-plugin-svg-social-card
 
-[![npm](https://img.shields.io/badge/npm-0.1.0-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
+[![npm](https://img.shields.io/badge/npm-0.1.1-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
 [![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
 [![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
 
@@ -355,4 +355,5 @@ partial). Move the call into the layout that renders the post body.
 
 ## License
 
-MIT © Jakub T. Jankiewicz
+Copyright (C) 2026 [Jakub T. Jankiewicz](https://jakub.jankiewicz.org)<br/>
+Released under MIT license
