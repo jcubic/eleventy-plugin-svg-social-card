@@ -72,7 +72,7 @@ In your **article layout** (not in individual posts — put it in one place):
 ---
 layout: base.liquid
 ---
-{% capture cardUrl %}{% socialCard %}{% endcapture %}
+{% capture cardUrl %}{% card %}{% endcapture %}
 <article>
   <h1>{{ title }}</h1>
   {{ content }}
@@ -81,7 +81,7 @@ layout: base.liquid
 
 In Liquid, shortcodes are tags (not variables), so you need `{% capture %}` to
 stash the returned URL into a variable. In Nunjucks it's just
-`{% set cardUrl = socialCard() %}`.
+`{% set cardUrl = card() %}`.
 
 In your `<head>`:
 
@@ -97,6 +97,68 @@ In your `<head>`:
 
 The shortcode returns the image URL, so you can pass it around like any other
 value.
+
+## Multiple cards (articles, pages, tags…)
+
+If you want more than one card design — say, a dark card for blog posts and
+a light card for static pages — pass a `cards` map instead of a single
+`template`. The shortcode then takes the card name as an argument:
+
+```js
+// .eleventy.js
+eleventyConfig.addPlugin(socialCard, {
+    shortcode: 'card',            // default
+    cards: {
+        article: {
+            template: 'src/cards/article.svg',
+            outputDir: '_site/img/articles',
+            urlPath:   '/img/articles',
+            data(ctx) {
+                return {
+                    title:  ctx.title,
+                    author: ctx.author,
+                    date:   new Date(ctx.date).toDateString(),
+                };
+            },
+        },
+        pages: {
+            template: 'src/cards/page.svg',
+            outputDir: '_site/img/pages',
+            urlPath:   '/img/pages',
+            data(ctx) {
+                return { title: ctx.title, site: ctx.siteName };
+            },
+        },
+    },
+});
+```
+
+In your article layout:
+
+```liquid
+{% capture cardUrl %}{% card "article" %}{% endcapture %}
+```
+
+In your page layout:
+
+```liquid
+{% capture cardUrl %}{% card "pages" %}{% endcapture %}
+```
+
+Each variant has its own template, output directory, and `data()`, so you can
+tailor both the design and the variables it receives. Everything except
+`template` and `data` is optional per-variant and falls back to the plugin
+defaults.
+
+If you call the shortcode without a name (or with one that doesn't exist),
+the build fails with the list of available cards — no silently-wrong PNGs.
+
+**Exception:** if `cards` has exactly one entry, `{% card %}` with no argument
+resolves to that single card. You only need to pass a name when there's more
+than one to disambiguate.
+
+See `examples/single/` and `examples/multiple/` in this repo for runnable
+end-to-end projects.
 
 ## Designing the SVG
 
@@ -198,7 +260,8 @@ Inkscape's preview. It'll render correctly when the plugin screenshots it.
 | ------------ | ------------------------------ | ------------------------------ | ----------- |
 | `template`   | `string` **(required)**        | —                              | Path to the `.svg` template. |
 | `data`       | `function` **(required)**      | —                              | `(ctx, page) => {...}`. Returns the variables for the SVG. `ctx` is the page's template data; `page` is Eleventy's `page` object. |
-| `shortcode`  | `string`                       | `'socialCard'`                 | Shortcode name. |
+| `shortcode`  | `string`                       | `'card'`                       | Shortcode name. |
+| `cards`      | `object` (see below)           | `null`                         | If present, register a multi-variant shortcode — each key is a card name, each value is a variant-scoped options object. Ignores top-level `template`/`data`/`outputDir`/etc. when set. |
 | `outputDir`  | `string`                       | `'_site/img/social-cards'`     | Where to write the PNG. |
 | `urlPath`    | `string`                       | `'/img/social-cards'`          | Public URL prefix (what the shortcode returns). |
 | `filename`   | `(page) => string`             | ``page => `${page.fileSlug}.png` `` | Output filename. |

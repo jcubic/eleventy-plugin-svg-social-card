@@ -1,4 +1,4 @@
-import socialCard from '../src/index.js';
+import socialCard from '../../src/index.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
