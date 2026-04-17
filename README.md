@@ -231,43 +231,20 @@ eleventyConfig.addCollection('articles', (api) =>
 {%- endif %}
 ```
 
-## CI validation
-
-Invalid XML in the SVG template (unclosed tag, unescaped `&`) will silently
-render broken cards. Validate the template early in your build:
-
-```yaml
-# .github/workflows/build.yaml
-- name: Validate social card template
-  run: |
-    node --input-type=module -e "
-      import('eleventy-plugin-svg-social-card/validate').then(async ({ validateSvgTemplate }) => {
-        await validateSvgTemplate('src/card/social-card.svg', {
-          title:  'Test &amp; title',
-          author: 'Author &lt;with&gt; chars',
-          date:   '1 Jan 2026',
-        });
-        console.log('SVG template OK');
-      }).catch(e => { console.error('::error::' + e.message); process.exit(1); });
-    "
-```
-
-`validateSvgTemplate` renders the template with your sample vars and parses
-the result with [`xmllint-wasm`](https://www.npmjs.com/package/xmllint-wasm)
-— a WASM build of libxml2's `xmllint`, so no `apt-get` / system `libxml2`
-needed. Throws on invalid XML; the error's `.errors` array has the raw
-parser messages.
-
 ## How it works
 
 For each page that calls the shortcode:
 
 1. Renders the SVG template with the variables returned by your `data()`.
-2. Writes it to a per-page temp file (`tmp-social-card-<filename>.svg`).
-3. Opens the temp SVG in a headless Chromium page at the configured viewport.
-4. Screenshots it to `outputDir/<filename>`.
-5. Deletes the temp SVG.
-6. Returns the public URL (`urlPath + filename`).
+2. On the first render of the build, parses the rendered XML with
+   [`xmllint-wasm`](https://www.npmjs.com/package/xmllint-wasm). If it's not
+   well-formed, throws — the Eleventy build fails with the parser's line
+   and column. Subsequent renders skip this check.
+3. Writes the SVG to a per-page temp file (`tmp-social-card-<filename>.svg`).
+4. Opens the temp SVG in a headless Chromium page at the configured viewport.
+5. Screenshots it to `outputDir/<filename>`.
+6. Deletes the temp SVG.
+7. Returns the public URL (`urlPath + filename`).
 
 A single Chromium instance is launched at `eleventy.before` and closed at
 `eleventy.after`, so you pay the startup cost once per build, not per page.
@@ -279,8 +256,9 @@ This plugin uses a per-page temp file to avoid that; if you extend the plugin
 or replace the `browser` factory, keep that invariant.
 
 **Card is blank / shows `{{ title }}` verbatim.** The rendered SVG is invalid
-XML. Usually an unescaped `&`, `<`, or `>` in a value. Keep `escape: true`,
-or run `validateSvgTemplate()` in CI.
+XML. Usually an unescaped `&`, `<`, or `>` in a value. Keep `escape: true`
+so the plugin handles interpolated values; the built-in `xmllint-wasm` check
+will fail the build on the first page if the template itself is malformed.
 
 **Fonts look wrong in CI but fine locally.** Chromium in CI only has whatever
 fonts are installed on the runner. Install the fonts your SVG uses:

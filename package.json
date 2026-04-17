@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "description": "Eleventy plugin that generates per-page social card images (OG image / Twitter card) from an SVG template using a headless browser.",
   "type": "module",
-  "main": "./index.js",
+  "main": "./src/index.js",
   "exports": {
-    ".": "./index.js",
-    "./validate": "./validate.js"
+    ".": "./src/index.js"
   },
   "files": [
-    "index.js",
-    "validate.js",
+    "src/",
     "README.md",
     "LICENSE"
   ],

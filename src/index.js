@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Liquid } from 'liquidjs';
 import puppeteer from 'puppeteer';
+import { validateXML } from 'xmllint-wasm';
 
 const liquid = new Liquid();
 
@@ -59,6 +60,24 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     eleventyConfig.on('eleventy.before', async () => {
         const src = await fs.readFile(options.template, 'utf8');
         parsedTemplate = liquid.parse(src);
+
+        // Validate the template's structural XML once up front, before
+        // launching Chromium. Empty-string vars are enough to detect
+        // unclosed / mismatched tags and extra content — the common failure
+        // modes that would otherwise render a pink error banner into the
+        // final PNG.
+        const probe = await liquid.render(parsedTemplate, {});
+        const result = await validateXML({
+            xml: probe,
+            normalization: 'format',
+        });
+        if (!result.valid) {
+            const msg = result.errors[0]?.message ?? 'unknown XML error';
+            throw new Error(
+                `[eleventy-plugin-svg-social-card] SVG template renders ` +
+                `invalid XML (${options.template}): ${msg}`
+            );
+        }
 
         if (options.browser) {
             browser = await options.browser();
