@@ -277,25 +277,37 @@ Inkscape's preview. It'll render correctly when the plugin screenshots it.
 ## Only show the meta tag for pages that actually have a card
 
 If your `<head>` is shared across article and non-article pages, guard the
-meta tag. The cleanest way is with an Eleventy collection:
+meta tag with a tag check on the frontmatter — no collection needed:
+
+```liquid
+{% if tags contains 'post' %}
+  {% capture cardUrl %}{% card %}{% endcapture %}
+  <meta property="og:image" content="{{ site.url }}{{ cardUrl }}" />
+{% else %}
+  <meta property="og:image" content="{{ site.url }}/img/default-card.png" />
+{% endif %}
+```
+
+That's it. Non-article pages skip the whole block — the shortcode never
+runs for them, so no stray PNGs get generated.
+
+In Nunjucks: `{% if "post" in tags %}` / `{% set cardUrl = card() %}`.
+
+If your tag naming is more elaborate — for example multi-language tags like
+`articles_en`, `articles_pl` — add a filter that returns truthy for any
+article tag and use it inline:
 
 ```js
-eleventyConfig.addCollection('articles', (api) =>
-    api.getAll().filter(item =>
-        (item.data.tags ?? []).includes('post')
-    )
+eleventyConfig.addFilter('isArticle', (tags) =>
+    Array.isArray(tags) && tags.some(t => t.startsWith('articles_'))
 );
 ```
 
 ```liquid
-{%- assign match    = collections.articles | where: "url", page.url -%}
-{%- assign hasCard  = match.size > 0 -%}
-
-{%- if hasCard %}
-<meta property="og:image" content="{{ site.url }}{{ cardUrl }}" />
-{%- else %}
-<meta property="og:image" content="{{ site.url }}/img/default-card.png" />
-{%- endif %}
+{% if tags | isArticle %}
+  {% capture cardUrl %}{% card %}{% endcapture %}
+  <meta property="og:image" content="{{ site.url }}{{ cardUrl }}" />
+{% endif %}
 ```
 
 ## How it works
