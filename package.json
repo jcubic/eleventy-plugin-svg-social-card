@@ -1,0 +1,53 @@
+{
+  "name": "eleventy-plugin-svg-social-card",
+  "version": "0.1.0",
+  "description": "Eleventy plugin that generates per-page social card images (OG image / Twitter card) from an SVG template using a headless browser.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./validate": "./validate.js"
+  },
+  "files": [
+    "index.js",
+    "validate.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "example": "cd example && npx eleventy --config=.eleventy.js"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^3.0.0"
+  },
+  "keywords": [
+    "eleventy",
+    "eleventy-plugin",
+    "social-card",
+    "open-graph",
+    "og-image",
+    "twitter-card",
+    "svg"
+  ],
+  "author": "Jakub T. Jankiewicz <jcubic.jj@gmail.com> (https://jakub.jankiewicz.org)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcubic/eleventy-plugin-svg-social-card.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jcubic/eleventy-plugin-svg-social-card/issues"
+  },
+  "homepage": "https://github.com/jcubic/eleventy-plugin-svg-social-card#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "liquidjs": "^10.0.0",
+    "playwright": "^1.40.0",
+    "xmllint-wasm": "^5.2.0"
+  },
+  "peerDependencies": {
+    "@11ty/eleventy": ">=2.0.0"
+  }
+}
