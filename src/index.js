@@ -203,6 +203,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             await fs.unlink(tmpSvg).catch(() => {});
         }
 
+        const relOut = path.relative(process.cwd(), outPath);
+        console.log(`[11ty] Writing ${relOut} from ${page.inputPath} (social-card)`);
+
         return path.posix.join(v.urlPath, filename);
     }
 
