@@ -14,8 +14,9 @@ Eleventy site from an SVG template, rendered via a headless browser.
 
 ```bash
 npm install eleventy-plugin-svg-social-card
-npx playwright install --with-deps chromium
 ```
+
+Puppeteer bundles its own Chromium — no extra install step.
 
 ## Quick start
 
@@ -71,12 +72,16 @@ In your **article layout** (not in individual posts — put it in one place):
 ---
 layout: base.liquid
 ---
-{% assign cardUrl = socialCard %}
+{% capture cardUrl %}{% socialCard %}{% endcapture %}
 <article>
   <h1>{{ title }}</h1>
   {{ content }}
 </article>
 ```
+
+In Liquid, shortcodes are tags (not variables), so you need `{% capture %}` to
+stash the returned URL into a variable. In Nunjucks it's just
+`{% set cardUrl = socialCard() %}`.
 
 In your `<head>`:
 
@@ -93,6 +98,100 @@ In your `<head>`:
 The shortcode returns the image URL, so you can pass it around like any other
 value.
 
+## Designing the SVG
+
+### Use Inkscape
+
+[Inkscape](https://inkscape.org/) is the recommended editor — SVG is its
+native file format, so there's no lossy export step and the `.svg` you commit
+is the same file you edit. Design at **1200×630** (the Open Graph standard)
+and save as *Plain SVG* (File → Save As → *Plain SVG (\*.svg)*). Plain SVG
+drops Inkscape-specific metadata and keeps the file small.
+
+### Re-open the file in a text editor after saving
+
+This is easy to miss and will silently break your card:
+
+**Inkscape URL-encodes curly braces inside attribute values on save.**
+If you type `{{ path }}/avatars/{{ username }}.jpg` into an image's
+*Image Properties → URL* field, Inkscape saves it as:
+
+```xml
+xlink:href="%7B%7B%20path%20%7D%7D/avatars/%7B%7B%20username%20%7D%7D.jpg"
+```
+
+The template engine won't see any placeholders, so the `href` is a literal
+string and the image won't load. Same thing happens with `href`, `style`
+URLs, and any other attribute where you want a `{{ ... }}`.
+
+**After every save in Inkscape, open the `.svg` in a text editor** and
+replace each `%7B%7B%20name%20%7D%7D` with the literal `{{ name }}`.
+Placeholders inside element text (e.g. between `<text>` and `</text>`, or
+inside a `<foreignObject>`'s `<div>`) survive the save — it's only
+attributes that get encoded.
+
+A quick find-and-replace recipe:
+
+| Encoded                       | Replace with      |
+| ----------------------------- | ----------------- |
+| `%7B%7B%20`                   | `{{ `             |
+| `%20%7D%7D`                   | ` }}`             |
+
+### Why `foreignObject` + `<xhtml:div>` for the title
+
+Raw SVG `<text>` does not wrap. Each line must be its own `<tspan>` (or
+separate `<text>` element) with an explicit `x` and `y` — the renderer never
+breaks a long string across multiple lines automatically. That makes SVG
+`<text>` fine for single-line labels (author, date) but painful for article
+titles of unpredictable length.
+
+`<foreignObject>` lets you embed an HTML fragment inside the SVG. The
+headless browser that renders the card treats the `<xhtml:div>` as real HTML
+and wraps the text naturally using CSS (`width`, `font-size`, `line-height`).
+When you screenshot the page, that wrapped HTML is baked into the PNG.
+
+```xml
+<foreignObject x="80" y="120" width="1040" height="360">
+  <xhtml:div style="font: 700 64px sans-serif; color: #fff; line-height: 1.15;">
+    {{ title }}
+  </xhtml:div>
+</foreignObject>
+```
+
+Two things to remember:
+
+- Declare the XHTML namespace on the root `<svg>`:
+  `xmlns:xhtml="http://www.w3.org/1999/xhtml"`.
+- The `width` on `<foreignObject>` is what the HTML wraps against. Tune it
+  with the longest realistic title you expect.
+
+Use `<text>` for anything that's naturally one line (byline, date, tag) —
+it's simpler and renders identically across SVG tools. Use
+`<foreignObject>` only where wrapping matters.
+
+### Why a real browser (and Puppeteer)
+
+`<foreignObject>` is part of the SVG spec, but only **browser-grade
+renderers** actually implement it. If you open your template in Inkscape,
+preview it in most SVG viewers, or render it with ImageMagick / `librsvg` /
+`resvg`, the area inside `<foreignObject>` will be **blank** — you'll see
+the background and the `<text>` elements, but no title.
+
+That's not a bug in the tool; it's a conscious omission. Implementing
+`<foreignObject>` requires a full HTML/CSS engine embedded inside the SVG
+renderer (layout, font shaping, line-breaking, inline formatting — the
+whole pipeline). Drawing tools and server-side converters deliberately
+skip it because the cost is enormous and the gain is narrow.
+
+Browsers already have that engine, so rendering the SVG in a headless
+Chromium and screenshotting the result is the only reliable way to get a
+PNG with properly-wrapped HTML text baked in. That's what this plugin
+does, and why it ships with **Puppeteer** — which bundles its own
+Chromium and works cross-distro without needing system packages.
+
+In short: don't be alarmed when your template looks half-empty in
+Inkscape's preview. It'll render correctly when the plugin screenshots it.
+
 ## Options
 
 | Option       | Type                           | Default                        | Description |
@@ -106,7 +205,7 @@ value.
 | `viewport`   | `{width, height}`              | `{1200, 630}`                  | Browser viewport for the screenshot. |
 | `delay`      | `number` (ms)                  | `100`                          | Pause after page load, so fonts settle. |
 | `escape`     | `boolean`                      | `true`                         | Auto XML-escape all values returned by `data()`. Disable if you need to inject raw markup. |
-| `browser`    | `async () => Browser`          | `null`                         | Optional factory for a custom Playwright `Browser` instance. Default launches `chromium` with `--no-sandbox`. |
+| `browser`    | `async () => Browser`          | `null`                         | Optional factory for a custom Puppeteer `Browser` instance. Default launches with `headless: 'new'` and `--no-sandbox`. |
 
 ## Only show the meta tag for pages that actually have a card
 
