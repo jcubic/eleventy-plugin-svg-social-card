@@ -1,3 +1,6 @@
+## 0.2.1
+* minor issue in README
+
 ## 0.2.0
 * make URL emit optional
 
