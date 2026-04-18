@@ -11,8 +11,9 @@ Eleventy site from an SVG template, rendered via a headless browser.
 - One SVG template with `{{ placeholders }}`, one shortcode per page.
 - Safe-by-default: XML-escapes every interpolated value.
 - Unique per-page temp file — no race conditions when Eleventy builds in parallel.
-- Returns the public URL of the generated image, so you can drop it straight
-  into your `<head>`.
+- `{% card %}` renders nothing by default (pure side effect); add `"emit"`
+  (`{% card "emit" %}`) when you want the URL handed back so you can capture
+  it for meta tags.
 
 ## Install
 
@@ -76,31 +77,33 @@ In your **article layout** (not in individual posts — put it in one place):
 ---
 layout: base.liquid
 ---
-{% capture cardUrl %}{% card %}{% endcapture %}
+{% card %}
 <article>
   <h1>{{ title }}</h1>
   {{ content }}
 </article>
 ```
 
-In Liquid, shortcodes are tags (not variables), so you need `{% capture %}` to
-stash the returned URL into a variable. In Nunjucks it's just
-`{% set cardUrl = card() %}`.
+The shortcode produces no output — it writes the PNG to
+`<outputDir>/<page.fileSlug>.png` and that's it.
 
-In your `<head>`:
+To use the URL in meta tags, add `"emit"` so the shortcode returns it, and
+capture:
 
 ```liquid
-{% if cardUrl %}
+{%- capture cardUrl -%}{% card "emit" %}{%- endcapture -%}
+
 <meta property="og:image"        content="{{ site.url }}{{ cardUrl }}" />
 <meta property="og:image:width"  content="1200" />
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card"        content="summary_large_image" />
 <meta name="twitter:image"       content="{{ site.url }}{{ cardUrl }}" />
-{% endif %}
 ```
 
-The shortcode returns the image URL, so you can pass it around like any other
-value.
+Nunjucks: `{% set cardUrl = card("emit") %}`.
+
+`"emit"` is the only literal the shortcode recognises here — any other string
+is treated as the card-variant name (see below).
 
 ## Multiple cards (articles, pages, tags…)
 
@@ -140,14 +143,22 @@ eleventyConfig.addPlugin(socialCard, {
 In your article layout:
 
 ```liquid
-{% capture cardUrl %}{% card "article" %}{% endcapture %}
+{% card "article" %}
 ```
 
 In your page layout:
 
 ```liquid
-{% capture cardUrl %}{% card "pages" %}{% endcapture %}
+{% card "pages" %}
 ```
+
+To emit the URL in multi-card mode, pass `"emit"` as the second argument:
+
+```liquid
+{%- capture cardUrl -%}{% card "article" "emit" %}{%- endcapture -%}
+```
+
+(`"emit"` is a reserved name — you can't name a card variant `emit`.)
 
 Each variant has its own template, output directory, and `data()`, so you can
 tailor both the design and the variables it receives. Everything except
@@ -281,7 +292,7 @@ meta tag with a tag check on the frontmatter — no collection needed:
 
 ```liquid
 {% if tags contains 'post' %}
-  {% capture cardUrl %}{% card %}{% endcapture %}
+  {%- capture cardUrl -%}{% card "emit" %}{%- endcapture -%}
   <meta property="og:image" content="{{ site.url }}{{ cardUrl }}" />
 {% else %}
   <meta property="og:image" content="{{ site.url }}/img/default-card.png" />
@@ -291,7 +302,7 @@ meta tag with a tag check on the frontmatter — no collection needed:
 That's it. Non-article pages skip the whole block — the shortcode never
 runs for them, so no stray PNGs get generated.
 
-In Nunjucks: `{% if "post" in tags %}` / `{% set cardUrl = card() %}`.
+In Nunjucks: `{% if "post" in tags %}` / `{% set cardUrl = card("emit") %}`.
 
 If your tag naming is more elaborate — for example multi-language tags like
 `articles_en`, `articles_pl` — add a filter that returns truthy for any
@@ -305,7 +316,7 @@ eleventyConfig.addFilter('isArticle', (tags) =>
 
 ```liquid
 {% if tags | isArticle %}
-  {% capture cardUrl %}{% card %}{% endcapture %}
+  {%- capture cardUrl -%}{% card "emit" %}{%- endcapture -%}
   <meta property="og:image" content="{{ site.url }}{{ cardUrl }}" />
 {% endif %}
 ```

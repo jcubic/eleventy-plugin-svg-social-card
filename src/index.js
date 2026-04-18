@@ -78,6 +78,12 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
     const variants = {};
     for (const [name, v] of Object.entries(rawVariants)) {
+        if (isMulti && name === 'emit') {
+            throw new Error(prefix(
+                `card name "emit" is reserved (it's the flag that makes ` +
+                `{% ${shortcodeName} "emit" %} return the URL). Rename the card.`
+            ));
+        }
         if (!v || typeof v !== 'object') {
             throw new Error(prefix(
                 `card "${name}" must be an object with \`template\` and \`data\`.`
@@ -144,7 +150,7 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         }
     });
 
-    async function renderCard(variantName, ctx, page) {
+    async function renderCard(variantName, emit, ctx, page) {
         let name;
         if (isMulti) {
             const keys = Object.keys(variants);
@@ -206,14 +212,33 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         const relOut = path.relative(process.cwd(), outPath);
         console.log(`[11ty] Writing ${relOut} from ${page.inputPath} (social-card)`);
 
-        return path.posix.join(v.urlPath, filename);
+        if (emit) {
+            return path.posix.join(v.urlPath, filename);
+        }
     }
 
-    eleventyConfig.addAsyncShortcode(shortcodeName, async function(variantName) {
+    const EMIT = 'emit';
+
+    eleventyConfig.addAsyncShortcode(shortcodeName, async function(arg1, arg2) {
+        // Accept `emit` as the flag in either position:
+        //   {% card %}                   → render, no output
+        //   {% card "emit" %}            → render, return URL
+        //   {% card "article" %}         → render article variant, no output
+        //   {% card "article" "emit" %}  → render article variant, return URL
+        let variantName, emit;
+        if (arg1 === EMIT) {
+            variantName = undefined;
+            emit = true;
+        } else {
+            variantName = arg1;
+            emit = arg2 === EMIT;
+        }
+
         const ctx = this.ctx?.environments ?? {};
         const page = this.page ?? {};
+        let result;
         try {
-            return await renderCard(variantName, ctx, page);
+            result = await renderCard(variantName, emit, ctx, page);
         } catch (err) {
             // Close Chromium on any failure — otherwise the open WebSocket
             // keeps Node's event loop alive and Eleventy hangs instead of
@@ -224,6 +249,7 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             }
             throw err;
         }
+        return result ?? '';
     });
 }
 
