@@ -1,3 +1,6 @@
+## 0.2.2
+* fix cascading cleanup errors in a GitHub workflow
+
 ## 0.2.1
 * minor issue in README
 

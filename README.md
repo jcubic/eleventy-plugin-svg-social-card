@@ -1,6 +1,6 @@
 # eleventy-plugin-svg-social-card
 
-[![npm](https://img.shields.io/badge/npm-0.2.1-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
+[![npm](https://img.shields.io/badge/npm-0.2.2-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
 [![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
 [![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
 

@@ -205,7 +205,10 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             }
             await browserPage.screenshot({ path: outPath });
         } finally {
-            await browserPage.close();
+            // Swallow close errors: if Chromium already discarded this target
+            // (e.g. under memory pressure on CI), the screenshot above either
+            // succeeded or threw — the close failure itself is cleanup noise.
+            await browserPage.close().catch(() => {});
             await fs.unlink(tmpSvg).catch(() => {});
         }
 
@@ -236,19 +239,14 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
         const ctx = this.ctx?.environments ?? {};
         const page = this.page ?? {};
-        let result;
-        try {
-            result = await renderCard(variantName, emit, ctx, page);
-        } catch (err) {
-            // Close Chromium on any failure — otherwise the open WebSocket
-            // keeps Node's event loop alive and Eleventy hangs instead of
-            // surfacing the error and exiting.
-            if (browser && ownBrowser) {
-                await browser.close().catch(() => {});
-                browser = null;
-            }
-            throw err;
-        }
+        // Let errors propagate. The previous version closed the entire
+        // browser on any shortcode failure, which cascaded to every other
+        // in-flight render when Eleventy builds pages in parallel
+        // (one page's hiccup killed the whole browser, making every other
+        // page's `browserPage.close()` error with "No target" too).
+        // Cleanup now happens in `eleventy.after` for both success and
+        // error paths.
+        const result = await renderCard(variantName, emit, ctx, page);
         return result ?? '';
     });
 }
