@@ -135,9 +135,15 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             browser = await userOptions.browser();
             ownBrowser = false;
         } else {
+            // `--disable-dev-shm-usage` is required on CI (GitHub Actions,
+            // Docker) where /dev/shm is ~64MB. Without it, parallel page
+            // renders exhaust shared memory, Chromium renderer processes
+            // hang, and `Page.captureScreenshot` stalls until puppeteer's
+            // 180s protocolTimeout. `launchOptions` lets users override.
             browser = await puppeteer.launch({
                 headless: 'new',
-                args: ['--no-sandbox'],
+                args: ['--no-sandbox', '--disable-dev-shm-usage'],
+                ...(userOptions.launchOptions ?? {}),
             });
             ownBrowser = true;
         }
@@ -145,7 +151,21 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
     eleventyConfig.on('eleventy.after', async () => {
         if (browser && ownBrowser) {
-            await browser.close();
+            // Race close against a hard timeout. If the browser's renderer
+            // processes are zombies, `browser.close()` can hang on the CDP
+            // round-trip and keep the Node process alive indefinitely —
+            // which is what made failing CI builds run until the job
+            // timeout instead of exiting with a clear error.
+            await Promise.race([
+                browser.close().catch(() => {}),
+                new Promise(resolve => setTimeout(resolve, 10000)),
+            ]);
+            try {
+                const proc = browser.process?.();
+                if (proc && proc.exitCode === null) {
+                    proc.kill('SIGKILL');
+                }
+            } catch {}
             browser = null;
         }
     });
