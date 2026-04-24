@@ -1,6 +1,6 @@
 # eleventy-plugin-svg-social-card
 
-[![npm](https://img.shields.io/badge/npm-0.2.3-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
+[![npm](https://img.shields.io/badge/npm-0.2.4-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
 [![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
 [![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
 
@@ -283,8 +283,9 @@ Inkscape's preview. It'll render correctly when the plugin screenshots it.
 | `viewport`   | `{width, height}`              | `{1200, 630}`                  | Browser viewport for the screenshot. |
 | `delay`      | `number` (ms)                  | `100`                          | Pause after page load, so fonts settle. |
 | `escape`     | `boolean`                      | `true`                         | Auto XML-escape all values returned by `data()`. Disable if you need to inject raw markup. |
-| `browser`    | `async () => Browser`          | `null`                         | Optional factory for a custom Puppeteer `Browser` instance. Default launches with `headless: 'new'`, `--no-sandbox`, and `--disable-dev-shm-usage`. |
-| `launchOptions` | `object`                    | `{}`                           | Extra options merged into the default `puppeteer.launch()` call (ignored when `browser` is set). Use this to append args, set `executablePath`, etc. without replacing the factory. |
+| `browser`    | `async () => Browser`          | `null`                         | Optional factory for a custom Puppeteer `Browser` instance. Default launches with `headless: 'new'` and CI-safe flags (`--no-sandbox`, `--disable-dev-shm-usage`, `--disable-gpu`) and a 60s `protocolTimeout`. |
+| `launchOptions` | `object`                    | `{}`                           | Extra options merged into the default `puppeteer.launch()` call (ignored when `browser` is set). Use this to append args, raise `protocolTimeout`, set `executablePath`, etc. without replacing the factory. |
+| `concurrency` | `number`                      | `1`                            | Max number of Chromium tabs that render in parallel. Default `1` is sequential — the safest choice on CI, where parallel renders starve `/dev/shm` and stall `Page.captureScreenshot`. Raise it if you've profiled your build and your runner can cope. |
 
 ## Only show the meta tag for pages that actually have a card
 

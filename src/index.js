@@ -25,6 +25,36 @@ function escapeAll(data) {
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
+// Minimal semaphore so we can bound how many Chromium tabs are open at once.
+// Eleventy renders pages in parallel; with a large site that produced ~50
+// concurrent `browser.newPage()` calls, which is enough to starve a GitHub
+// Actions runner (limited CPU, limited /dev/shm, no GPU) and make
+// `Page.captureScreenshot` stall until puppeteer's 180s protocolTimeout.
+function createSemaphore(limit) {
+    let active = 0;
+    const waiters = [];
+    const acquire = () => {
+        if (active < limit) {
+            active++;
+            return Promise.resolve();
+        }
+        return new Promise(resolve => waiters.push(resolve));
+    };
+    const release = () => {
+        const next = waiters.shift();
+        if (next) next();
+        else active--;
+    };
+    return async (task) => {
+        await acquire();
+        try {
+            return await task();
+        } finally {
+            release();
+        }
+    };
+}
+
 const CARD_DEFAULTS = {
     outputDir: '_site/img/social-cards',
     urlPath: '/img/social-cards',
@@ -109,6 +139,13 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     let browser;
     let ownBrowser = false;
 
+    // `concurrency: 1` is the safe default — sequential renders are still
+    // fast (an SVG → PNG screenshot is tens of milliseconds) and they avoid
+    // the "stampede of tabs" failure mode on CI. Raise it if you've profiled
+    // your build and know your runner can cope.
+    const concurrencyLimit = Math.max(1, Number(userOptions.concurrency) || 1);
+    const withSlot = createSemaphore(concurrencyLimit);
+
     eleventyConfig.on('eleventy.before', async () => {
         for (const [name, v] of Object.entries(variants)) {
             const src = await fs.readFile(v.template, 'utf8');
@@ -135,14 +172,21 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             browser = await userOptions.browser();
             ownBrowser = false;
         } else {
-            // `--disable-dev-shm-usage` is required on CI (GitHub Actions,
-            // Docker) where /dev/shm is ~64MB. Without it, parallel page
-            // renders exhaust shared memory, Chromium renderer processes
-            // hang, and `Page.captureScreenshot` stalls until puppeteer's
-            // 180s protocolTimeout. `launchOptions` lets users override.
+            // Default Chromium flags chosen for CI robustness:
+            //   --no-sandbox              : GitHub Actions containers have
+            //                               no user namespaces for the
+            //                               Chromium sandbox.
+            //   --disable-dev-shm-usage   : /dev/shm is ~64MB on CI; without
+            //                               this, screenshot calls stall.
+            //   --disable-gpu             : no GPU on CI — software path is
+            //                               more predictable.
+            // `protocolTimeout` is clamped to 60s so a stuck render fails
+            // well before a CI job's wall-clock timeout. `launchOptions`
+            // lets users override any of these.
             browser = await puppeteer.launch({
                 headless: 'new',
-                args: ['--no-sandbox', '--disable-dev-shm-usage'],
+                args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                protocolTimeout: 60_000,
                 ...(userOptions.launchOptions ?? {}),
             });
             ownBrowser = true;
@@ -216,21 +260,26 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(tmpSvg, rendered);
 
-        const browserPage = await browser.newPage();
-        try {
-            await browserPage.setViewport(v.viewport);
-            await browserPage.goto('file://' + tmpSvg);
-            if (v.delay > 0) {
-                await delay(v.delay);
+        // Only hold the semaphore around the browser work — the Liquid
+        // render and fs writes above are cheap and parallel-safe.
+        await withSlot(async () => {
+            const browserPage = await browser.newPage();
+            try {
+                await browserPage.setViewport(v.viewport);
+                await browserPage.goto('file://' + tmpSvg);
+                if (v.delay > 0) {
+                    await delay(v.delay);
+                }
+                await browserPage.screenshot({ path: outPath });
+            } finally {
+                // Swallow close errors: if Chromium already discarded this
+                // target (e.g. under memory pressure on CI), the screenshot
+                // above either succeeded or threw — the close failure itself
+                // is cleanup noise.
+                await browserPage.close().catch(() => {});
+                await fs.unlink(tmpSvg).catch(() => {});
             }
-            await browserPage.screenshot({ path: outPath });
-        } finally {
-            // Swallow close errors: if Chromium already discarded this target
-            // (e.g. under memory pressure on CI), the screenshot above either
-            // succeeded or threw — the close failure itself is cleanup noise.
-            await browserPage.close().catch(() => {});
-            await fs.unlink(tmpSvg).catch(() => {});
-        }
+        });
 
         const relOut = path.relative(process.cwd(), outPath);
         console.log(`[11ty] Writing ${relOut} from ${page.inputPath} (social-card)`);
