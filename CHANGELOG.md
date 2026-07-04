@@ -1,3 +1,18 @@
+## 0.3.0
+* in-memory render cache (on by default, `cache` option). Each card is hashed
+  by its rendered SVG — the exact bytes that would be screenshotted, capturing
+  both `data()` and template changes. On a `--watch`/`--serve` rebuild an
+  unchanged card is skipped: no temp file, no browser tab. Only cards whose
+  data or template actually changed get re-rendered
+* the headless browser is now launched **lazily**, on the first card that needs
+  rendering, instead of unconditionally at `eleventy.before`. A rebuild where
+  every card is cached never starts Chromium at all
+* new `enabled` option — a hard on/off switch for card generation. Accepts a
+  boolean or a predicate `({ runMode }) => boolean`, so you can skip rendering
+  during `--watch`/`--serve` and only pay for it on a real build. When disabled
+  the browser is never launched and `{% card "emit" %}` still returns the card
+  URL so meta tags stay valid
+
 ## 0.2.4
 * serialize screenshots by default (`concurrency: 1`). Eleventy renders pages
   in parallel, so on larger sites the plugin was opening dozens of Chromium

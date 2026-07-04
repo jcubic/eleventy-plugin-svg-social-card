@@ -1,6 +1,6 @@
 # eleventy-plugin-svg-social-card
 
-[![npm](https://img.shields.io/badge/npm-0.2.4-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
+[![npm](https://img.shields.io/badge/npm-0.3.0-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
 [![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
 [![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
 
@@ -276,6 +276,8 @@ Inkscape's preview. It'll render correctly when the plugin screenshots it.
 | `template`   | `string` **(required)**        | —                              | Path to the `.svg` template. |
 | `data`       | `function` **(required)**      | —                              | `(ctx, page) => {...}`. Returns the variables for the SVG. `ctx` is the page's template data; `page` is Eleventy's `page` object. |
 | `shortcode`  | `string`                       | `'card'`                       | Shortcode name. |
+| `enabled`    | `boolean` \| `({ runMode }) => boolean` | `true`                | Hard on/off switch for card generation. Pass `false`, or a predicate that receives Eleventy's run mode (`'build'`, `'watch'`, `'serve'`), to skip the headless-browser render entirely. See [Fast watch mode](#fast-watch-mode). |
+| `cache`      | `boolean`                      | `true`                          | Skip re-rendering a card when its rendered SVG is byte-for-byte identical to the last one written to the same path. The hash cache lives in memory and persists across `--watch`/`--serve` rebuilds, so only cards whose data or template actually changed get re-screenshotted. Set `false` to always render. See [Fast watch mode](#fast-watch-mode). |
 | `cards`      | `object` (see below)           | `null`                         | If present, register a multi-variant shortcode — each key is a card name, each value is a variant-scoped options object. Ignores top-level `template`/`data`/`outputDir`/etc. when set. |
 | `outputDir`  | `string`                       | `'_site/img/social-cards'`     | Where to write the PNG. |
 | `urlPath`    | `string`                       | `'/img/social-cards'`          | Public URL prefix (what the shortcode returns). |
@@ -323,23 +325,82 @@ eleventyConfig.addFilter('isArticle', (tags) =>
 {% endif %}
 ```
 
+## Fast watch mode
+
+Rendering a card through a headless browser is the slow part of a build. During
+`eleventy --serve` / `--watch` you save constantly, and re-screenshotting every
+card on every keystroke is what makes the dev server feel like it's freezing.
+Two features address this — one automatic, one a manual override.
+
+### The render cache (on by default)
+
+Every render is hashed by its **rendered SVG** — the exact bytes that would be
+screenshotted, which reflects both your `data()` values *and* the template
+file. On a `--watch`/`--serve` rebuild, if a card's hash matches what was last
+written to that path (and the PNG still exists), the plugin **skips it
+entirely** — no temp file, no browser tab. The browser is also launched
+**lazily**, on the first card that actually needs re-rendering, so a rebuild
+that touched only your content (not any card) never starts Chromium at all.
+
+The cache lives in memory for the life of the Eleventy process, so it persists
+across rebuilds but starts empty on each fresh `eleventy` run. It's on by
+default; set `cache: false` to always render.
+
+This is usually all you need: editing a blog post no longer re-renders its
+card, and the freeze goes away.
+
+### Turning cards off entirely (`enabled`)
+
+The cache can't help the one case where you're **editing a card's own SVG or
+its `data()`** — every save legitimately changes the hash and re-renders. When
+you're iterating on the card design itself (or just don't want any card PNGs
+during development), the `enabled` option is the hard off switch:
+
+```js
+eleventyConfig.addPlugin(socialCard, {
+    template: 'src/card/social-card.svg',
+    // Only render cards on a full build; never during --watch / --serve.
+    enabled: ({ runMode }) => runMode === 'build',
+    data(ctx) { /* … */ },
+});
+```
+
+`runMode` is Eleventy's build mode: `'build'` for a one-off `eleventy` run,
+`'watch'` for `--watch`, and `'serve'` for `--serve`. You can also pass a plain
+boolean (`enabled: false`) or drive it from an env var
+(`enabled: process.env.NODE_ENV === 'production'`).
+
+When generation is disabled:
+
+- The headless browser is **never launched** — no render work happens at all.
+- `{% card %}` renders nothing (as usual).
+- `{% card "emit" %}` still returns the card URL, so your `og:image` /
+  `twitter:image` meta tags stay valid. The URL points at whatever PNG your
+  last real build produced — if you've never run a full build, the image will
+  404 in the dev preview. That's expected; run `eleventy` once (or with
+  `enabled` on) to populate the cards.
+
 ## How it works
 
-For each page that calls the shortcode:
+At `eleventy.before`, each template is read, parsed, and validated once with
+[`xmllint-wasm`](https://www.npmjs.com/package/xmllint-wasm). If a template
+isn't well-formed XML, the build fails early with the parser's line and column.
+
+Then, for each page that calls the shortcode:
 
 1. Renders the SVG template with the variables returned by your `data()`.
-2. On the first render of the build, parses the rendered XML with
-   [`xmllint-wasm`](https://www.npmjs.com/package/xmllint-wasm). If it's not
-   well-formed, throws — the Eleventy build fails with the parser's line
-   and column. Subsequent renders skip this check.
+2. Hashes the rendered SVG. If it matches the hash last written to this card's
+   output path **and** that PNG still exists, the card is **skipped** (see
+   [the render cache](#the-render-cache-on-by-default)) — steps 3–6 don't run.
 3. Writes the SVG to a per-page temp file (`tmp-social-card-<filename>.svg`).
 4. Opens the temp SVG in a headless Chromium page at the configured viewport.
-5. Screenshots it to `outputDir/<filename>`.
+5. Screenshots it to `outputDir/<filename>` and records the hash.
 6. Deletes the temp SVG.
 7. Returns the public URL (`urlPath + filename`).
 
-A single Chromium instance is launched at `eleventy.before` and closed at
-`eleventy.after`, so you pay the startup cost once per build, not per page.
+Chromium is launched **lazily** — on the first card that actually needs
+rendering — and closed at `eleventy.after`. A build (or watch rebuild) in which
+every card is cached never starts the browser at all.
 
 ## Gotchas
 

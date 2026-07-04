@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { Liquid } from 'liquidjs';
 import puppeteer from 'puppeteer';
 import { validateXML } from 'xmllint-wasm';
@@ -24,6 +25,14 @@ function escapeAll(data) {
 }
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
+
+// Hash of the rendered SVG — the exact bytes that would be screenshotted.
+// This captures BOTH data changes (different interpolated values) and template
+// changes (Eleventy re-reads and re-parses the .svg every rebuild), so a stable
+// hash means the resulting PNG would be byte-for-byte the same as last time.
+const hashSvg = svg => crypto.createHash('sha1').update(svg).digest('hex');
+
+const fileExists = p => fs.access(p).then(() => true, () => false);
 
 // Minimal semaphore so we can bound how many Chromium tabs are open at once.
 // Eleventy renders pages in parallel; with a large site that produced ~50
@@ -136,8 +145,62 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         variants[name] = { ...CARD_DEFAULTS, ...v, parsed: null };
     }
 
+    // `enabled` toggles card generation. It's either a boolean or a predicate
+    // that receives Eleventy's `eleventy.before` payload (`{ runMode, ... }`),
+    // so you can skip the (expensive) browser render during `--watch`/`--serve`
+    // and only pay for it on a real `build`. Default: always on.
+    const enabledOption = userOptions.enabled ?? true;
+    let generationEnabled = true;
+
+    // In-memory render cache: output-PNG path -> hash of the rendered SVG that
+    // produced it. It lives in this plugin closure, so it PERSISTS across
+    // `--watch`/`--serve` rebuilds. On a rebuild, a card whose rendered SVG
+    // hashes the same as last time is skipped entirely — no temp file, no
+    // browser tab. That's what makes watch mode fast: only cards whose data or
+    // template actually changed get re-screenshotted.
+    const useCache = userOptions.cache ?? true;
+    const renderCache = new Map();
+
     let browser;
     let ownBrowser = false;
+    // The browser is launched lazily (on the first cache miss), not in
+    // `eleventy.before`. A rebuild that changes nothing never starts Chromium
+    // at all. `browserPromise` de-dupes concurrent launches under `concurrency`.
+    let browserPromise = null;
+
+    async function ensureBrowser() {
+        if (browser) return browser;
+        if (!browserPromise) {
+            browserPromise = (async () => {
+                if (userOptions.browser) {
+                    browser = await userOptions.browser();
+                    ownBrowser = false;
+                } else {
+                    // Default Chromium flags chosen for CI robustness:
+                    //   --no-sandbox              : GitHub Actions containers
+                    //                               have no user namespaces for
+                    //                               the Chromium sandbox.
+                    //   --disable-dev-shm-usage   : /dev/shm is ~64MB on CI;
+                    //                               without this, screenshot
+                    //                               calls stall.
+                    //   --disable-gpu             : no GPU on CI — software path
+                    //                               is more predictable.
+                    // `protocolTimeout` is clamped to 60s so a stuck render
+                    // fails well before a CI job's wall-clock timeout.
+                    // `launchOptions` lets users override any of these.
+                    browser = await puppeteer.launch({
+                        headless: 'new',
+                        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                        protocolTimeout: 60_000,
+                        ...(userOptions.launchOptions ?? {}),
+                    });
+                    ownBrowser = true;
+                }
+                return browser;
+            })();
+        }
+        return browserPromise;
+    }
 
     // `concurrency: 1` is the safe default — sequential renders are still
     // fast (an SVG → PNG screenshot is tens of milliseconds) and they avoid
@@ -146,7 +209,21 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     const concurrencyLimit = Math.max(1, Number(userOptions.concurrency) || 1);
     const withSlot = createSemaphore(concurrencyLimit);
 
-    eleventyConfig.on('eleventy.before', async () => {
+    eleventyConfig.on('eleventy.before', async (info) => {
+        generationEnabled = typeof enabledOption === 'function'
+            ? !!enabledOption(info ?? {})
+            : !!enabledOption;
+
+        if (!generationEnabled) {
+            // Skip template parsing, XML validation and the browser launch —
+            // the whole reason to disable is to make dev rebuilds fast. The
+            // shortcode still resolves `emit` to a URL (see `renderCard`), so
+            // meta tags keep working; the PNG just isn't (re)generated.
+            const mode = info?.runMode ? ` (runMode: ${info.runMode})` : '';
+            console.log(prefix(`card generation disabled — skipping renders${mode}`));
+            return;
+        }
+
         for (const [name, v] of Object.entries(variants)) {
             const src = await fs.readFile(v.template, 'utf8');
 
@@ -168,29 +245,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             }
         }
 
-        if (userOptions.browser) {
-            browser = await userOptions.browser();
-            ownBrowser = false;
-        } else {
-            // Default Chromium flags chosen for CI robustness:
-            //   --no-sandbox              : GitHub Actions containers have
-            //                               no user namespaces for the
-            //                               Chromium sandbox.
-            //   --disable-dev-shm-usage   : /dev/shm is ~64MB on CI; without
-            //                               this, screenshot calls stall.
-            //   --disable-gpu             : no GPU on CI — software path is
-            //                               more predictable.
-            // `protocolTimeout` is clamped to 60s so a stuck render fails
-            // well before a CI job's wall-clock timeout. `launchOptions`
-            // lets users override any of these.
-            browser = await puppeteer.launch({
-                headless: 'new',
-                args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-                protocolTimeout: 60_000,
-                ...(userOptions.launchOptions ?? {}),
-            });
-            ownBrowser = true;
-        }
+        // The browser is NOT launched here — `ensureBrowser()` starts it on the
+        // first cache miss. If every card is unchanged this build, Chromium
+        // never runs.
     });
 
     eleventyConfig.on('eleventy.after', async () => {
@@ -211,6 +268,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
                 }
             } catch {}
             browser = null;
+            // Drop the memoised launch so the next rebuild that has changes
+            // starts a fresh browser via `ensureBrowser()`.
+            browserPromise = null;
         }
     });
 
@@ -241,6 +301,19 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         }
 
         const v = variants[name];
+        const filename = v.filename(page);
+
+        // When generation is disabled we do no work here — no `data()` call,
+        // no Liquid render, no browser. `emit` still hands back the URL so the
+        // page's `og:image`/`twitter:image` tags stay valid in dev (they point
+        // at whatever card the last real build produced).
+        if (!generationEnabled) {
+            if (emit) {
+                return path.posix.join(v.urlPath, filename);
+            }
+            return;
+        }
+
         const raw = await v.data(ctx, page);
         if (!raw || typeof raw !== 'object') {
             throw new Error(prefix(
@@ -251,19 +324,36 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         const vars = v.escape ? escapeAll(raw) : raw;
         const rendered = await liquid.render(v.parsed, vars);
 
-        const filename = v.filename(page);
+        const outPath = path.join(v.outputDir, filename);
+        const relOut = path.relative(process.cwd(), outPath);
+
+        // Cache gate: if the rendered SVG hashes the same as the last one we
+        // screenshotted to this path AND that PNG still exists, there's nothing
+        // to do. This is what keeps `--watch` cheap — the browser is never even
+        // launched for a card that didn't change. We still verify the file is
+        // on disk so deleting `_site` (or a first run) forces a regenerate.
+        const hash = useCache ? hashSvg(rendered) : null;
+        if (useCache && renderCache.get(outPath) === hash && await fileExists(outPath)) {
+            console.log(`[11ty] Skipping ${relOut} from ${page.inputPath} (social-card, unchanged)`);
+            if (emit) {
+                return path.posix.join(v.urlPath, filename);
+            }
+            return;
+        }
+
         const tmpSvg = path.join(
             process.cwd(),
             `tmp-social-card-${name}-${filename.replace(/[^\w.-]/g, '_')}.svg`
         );
-        const outPath = path.join(v.outputDir, filename);
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(tmpSvg, rendered);
 
         // Only hold the semaphore around the browser work — the Liquid
-        // render and fs writes above are cheap and parallel-safe.
+        // render and fs writes above are cheap and parallel-safe. The browser
+        // is launched lazily here, on the first card that actually needs it.
         await withSlot(async () => {
-            const browserPage = await browser.newPage();
+            const b = await ensureBrowser();
+            const browserPage = await b.newPage();
             try {
                 await browserPage.setViewport(v.viewport);
                 await browserPage.goto('file://' + tmpSvg);
@@ -281,7 +371,12 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             }
         });
 
-        const relOut = path.relative(process.cwd(), outPath);
+        // Record the hash only after a successful screenshot, so a failed
+        // render doesn't poison the cache and skip the retry next time.
+        if (useCache) {
+            renderCache.set(outPath, hash);
+        }
+
         console.log(`[11ty] Writing ${relOut} from ${page.inputPath} (social-card)`);
 
         if (emit) {
