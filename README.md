@@ -431,17 +431,33 @@ partial). Move the call into the layout that renders the post body.
 
 ## Development
 
-Tests use [Vitest](https://vitest.dev/). They inject a fake browser through the
-`browser` option, so the suite runs fast and needs no real Chromium.
+Tests use [Vitest](https://vitest.dev/). The **unit suite** injects a fake
+browser through the `browser` option, so it runs fast and needs no real
+Chromium:
 
 ```bash
-npm test            # run once
-npm run test:watch  # watch mode
-npm run coverage    # run with a coverage report (coverage/lcov.info)
+npm test            # unit suite, run once
+npm run test:watch  # unit suite, watch mode
+npm run coverage    # unit suite with a coverage report (coverage/lcov.info)
 ```
 
-CI runs the suite on every push and pull request and publishes coverage to
-[Coveralls](https://coveralls.io/).
+The separate **E2E suite** launches a real headless Chromium and inspects the
+actual PNG output:
+
+```bash
+npm run test:e2e
+```
+
+It proves the one thing a real browser gives you over `librsvg`/`resvg`:
+`<foreignObject>` HTML actually renders (the region is painted, not blank). It
+also compares real renders against each other — identical input produces
+pixel-identical PNGs (the assumption the render cache relies on), and changing
+the data changes the pixels. It deliberately does **not** diff against a
+committed baseline image: exact pixels depend on installed fonts, anti-aliasing
+and the Chromium version, so a baseline would be flaky across machines.
+
+CI runs both suites on every push and pull request, and publishes unit-test
+coverage to [Coveralls](https://coveralls.io/).
 
 ## License
 

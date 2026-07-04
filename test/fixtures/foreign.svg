@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xhtml="http://www.w3.org/1999/xhtml"
+     viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#0b0b12"/>
+
+  <!-- The whole point of rendering with a real browser: `<foreignObject>`
+       embeds an HTML fragment that Chromium lays out and wraps with CSS.
+       librsvg / resvg / Inkscape leave this area BLANK — only a browser-grade
+       renderer paints it. The E2E suite asserts this region is not blank. -->
+  <foreignObject x="80" y="120" width="1040" height="360">
+    <xhtml:div xmlns="http://www.w3.org/1999/xhtml"
+               style="font: 700 64px sans-serif; color: #ffffff; line-height: 1.15;">
+      {{ title }}
+    </xhtml:div>
+  </foreignObject>
+</svg>

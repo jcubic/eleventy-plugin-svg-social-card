@@ -129,6 +129,19 @@ describe('rendering', () => {
         await t.fire('eleventy.before', { runMode: 'build' });
         await expect(t.call(page)).rejects.toThrow(/`data` must return an object/);
     });
+
+    it('interpolates a foreignObject HTML template (validated as XML)', async () => {
+        const t = setup({
+            template: path.join(FIX, 'foreign.svg'),
+            data: () => ({ title: 'Wrapped title' }),
+        });
+        // eleventy.before validates the template as XML — foreignObject + the
+        // xhtml namespace must be well-formed or this rejects.
+        await t.fire('eleventy.before', { runMode: 'build' });
+        await t.call(page);
+        expect(t.counters.svgs[0]).toContain('<foreignObject');
+        expect(t.counters.svgs[0]).toContain('Wrapped title');
+    });
 });
 
 describe('multiple cards', () => {

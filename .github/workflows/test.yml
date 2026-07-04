@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Tests inject a fake browser, so there's no need to download Puppeteer's
+    # bundled Chromium during `npm ci`.
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run coverage
+
+      - name: Publish coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage/lcov.info
+
+  e2e:
+    runs-on: ubuntu-latest
+    # This job renders cards with real Chromium, so it installs Puppeteer's
+    # bundled browser (no PUPPETEER_SKIP_DOWNLOAD here).
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run E2E render tests
+        run: npm run test:e2e

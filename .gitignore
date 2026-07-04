@@ -4,3 +4,4 @@ tmp-*.svg
 *.log
 coverage/
 test/.tmp/
+test/.tmp-e2e/
