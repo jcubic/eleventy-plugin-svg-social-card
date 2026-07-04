@@ -32,7 +32,11 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
 // hash means the resulting PNG would be byte-for-byte the same as last time.
 const hashSvg = svg => crypto.createHash('sha1').update(svg).digest('hex');
 
-const fileExists = p => fs.access(p).then(() => true, () => false);
+const fileExists = p =>
+    fs.access(p).then(
+        () => true,
+        () => false,
+    );
 
 // Minimal semaphore so we can bound how many Chromium tabs are open at once.
 // Eleventy renders pages in parallel; with a large site that produced ~50
@@ -54,7 +58,7 @@ function createSemaphore(limit) {
         if (next) next();
         else active--;
     };
-    return async (task) => {
+    return async task => {
         await acquire();
         try {
             return await task();
@@ -97,50 +101,58 @@ function warnOnUrlEncodedBraces(src, templatePath, cardName) {
     }
 
     const label = cardName ? `card "${cardName}" (${templatePath})` : templatePath;
-    console.warn(prefix(
-        `WARNING: ${label} contains URL-encoded Liquid placeholders on ` +
-        `line(s) ${[...affected].join(', ')}. This usually happens when ` +
-        `Inkscape saves {{ ... }} inside an attribute (xlink:href, href, etc.). ` +
-        `Replace "%7B%7B%20" with "{{ " and "%20%7D%7D" with " }}" in a text ` +
-        `editor to restore templating — otherwise the rendered card will ` +
-        `contain the literal encoded string.`
-    ));
+    console.warn(
+        prefix(
+            `WARNING: ${label} contains URL-encoded Liquid placeholders on ` +
+                `line(s) ${[...affected].join(', ')}. This usually happens when ` +
+                `Inkscape saves {{ ... }} inside an attribute (xlink:href, href, etc.). ` +
+                `Replace "%7B%7B%20" with "{{ " and "%20%7D%7D" with " }}" in a text ` +
+                `editor to restore templating — otherwise the rendered card will ` +
+                `contain the literal encoded string.`,
+        ),
+    );
 }
 
 export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     const shortcodeName = userOptions.shortcode ?? 'card';
     const isMulti = userOptions.cards != null;
 
-    const rawVariants = isMulti
-        ? userOptions.cards
-        : { [DEFAULT_VARIANT]: userOptions };
+    const rawVariants = isMulti ? userOptions.cards : { [DEFAULT_VARIANT]: userOptions };
 
     const variants = {};
     for (const [name, v] of Object.entries(rawVariants)) {
         if (isMulti && name === 'emit') {
-            throw new Error(prefix(
-                `card name "emit" is reserved (it's the flag that makes ` +
-                `{% ${shortcodeName} "emit" %} return the URL). Rename the card.`
-            ));
+            throw new Error(
+                prefix(
+                    `card name "emit" is reserved (it's the flag that makes ` +
+                        `{% ${shortcodeName} "emit" %} return the URL). Rename the card.`,
+                ),
+            );
         }
         if (!v || typeof v !== 'object') {
-            throw new Error(prefix(
-                `card "${name}" must be an object with \`template\` and \`data\`.`
-            ));
+            throw new Error(
+                prefix(
+                    `card "${name}" must be an object with \`template\` and \`data\`.`,
+                ),
+            );
         }
         if (!v.template) {
-            throw new Error(prefix(
-                isMulti
-                    ? `card "${name}" is missing required \`template\` option.`
-                    : '`template` option is required (path to your .svg file).'
-            ));
+            throw new Error(
+                prefix(
+                    isMulti
+                        ? `card "${name}" is missing required \`template\` option.`
+                        : '`template` option is required (path to your .svg file).',
+                ),
+            );
         }
         if (typeof v.data !== 'function') {
-            throw new Error(prefix(
-                isMulti
-                    ? `card "${name}" is missing required \`data\` function.`
-                    : '`data` option must be a function that returns the template variables.'
-            ));
+            throw new Error(
+                prefix(
+                    isMulti
+                        ? `card "${name}" is missing required \`data\` function.`
+                        : '`data` option must be a function that returns the template variables.',
+                ),
+            );
         }
         variants[name] = { ...CARD_DEFAULTS, ...v, parsed: null };
     }
@@ -190,7 +202,11 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
                     // `launchOptions` lets users override any of these.
                     browser = await puppeteer.launch({
                         headless: 'new',
-                        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+                        args: [
+                            '--no-sandbox',
+                            '--disable-dev-shm-usage',
+                            '--disable-gpu',
+                        ],
                         protocolTimeout: 60_000,
                         ...(userOptions.launchOptions ?? {}),
                     });
@@ -209,10 +225,11 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
     const concurrencyLimit = Math.max(1, Number(userOptions.concurrency) || 1);
     const withSlot = createSemaphore(concurrencyLimit);
 
-    eleventyConfig.on('eleventy.before', async (info) => {
-        generationEnabled = typeof enabledOption === 'function'
-            ? !!enabledOption(info ?? {})
-            : !!enabledOption;
+    eleventyConfig.on('eleventy.before', async info => {
+        generationEnabled =
+            typeof enabledOption === 'function'
+                ? !!enabledOption(info ?? {})
+                : !!enabledOption;
 
         if (!generationEnabled) {
             // Skip template parsing, XML validation and the browser launch —
@@ -239,9 +256,9 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
             if (!result.valid) {
                 const msg = result.errors[0]?.message ?? 'unknown XML error';
                 const label = isMulti ? `card "${name}" (${v.template})` : v.template;
-                throw new Error(prefix(
-                    `SVG template renders invalid XML (${label}): ${msg}`
-                ));
+                throw new Error(
+                    prefix(`SVG template renders invalid XML (${label}): ${msg}`),
+                );
             }
         }
 
@@ -282,17 +299,21 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
                 if (keys.length === 1) {
                     name = keys[0];
                 } else {
-                    throw new Error(prefix(
-                        `{% ${shortcodeName} %} requires a card name. ` +
-                        `Try {% ${shortcodeName} "${keys[0]}" %}. ` +
-                        `Available cards: ${keys.join(', ')}.`
-                    ));
+                    throw new Error(
+                        prefix(
+                            `{% ${shortcodeName} %} requires a card name. ` +
+                                `Try {% ${shortcodeName} "${keys[0]}" %}. ` +
+                                `Available cards: ${keys.join(', ')}.`,
+                        ),
+                    );
                 }
             } else if (!variants[variantName]) {
-                throw new Error(prefix(
-                    `unknown card "${variantName}". ` +
-                    `Available cards: ${keys.join(', ')}.`
-                ));
+                throw new Error(
+                    prefix(
+                        `unknown card "${variantName}". ` +
+                            `Available cards: ${keys.join(', ')}.`,
+                    ),
+                );
             } else {
                 name = variantName;
             }
@@ -316,10 +337,12 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
         const raw = await v.data(ctx, page);
         if (!raw || typeof raw !== 'object') {
-            throw new Error(prefix(
-                `\`data\` must return an object; got ${typeof raw} ` +
-                `for page ${page.inputPath}`
-            ));
+            throw new Error(
+                prefix(
+                    `\`data\` must return an object; got ${typeof raw} ` +
+                        `for page ${page.inputPath}`,
+                ),
+            );
         }
         const vars = v.escape ? escapeAll(raw) : raw;
         const rendered = await liquid.render(v.parsed, vars);
@@ -333,8 +356,14 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
         // launched for a card that didn't change. We still verify the file is
         // on disk so deleting `_site` (or a first run) forces a regenerate.
         const hash = useCache ? hashSvg(rendered) : null;
-        if (useCache && renderCache.get(outPath) === hash && await fileExists(outPath)) {
-            console.log(`[11ty] Skipping ${relOut} from ${page.inputPath} (social-card, unchanged)`);
+        if (
+            useCache &&
+            renderCache.get(outPath) === hash &&
+            (await fileExists(outPath))
+        ) {
+            console.log(
+                `[11ty] Skipping ${relOut} from ${page.inputPath} (social-card, unchanged)`,
+            );
             if (emit) {
                 return path.posix.join(v.urlPath, filename);
             }
@@ -343,7 +372,7 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
         const tmpSvg = path.join(
             process.cwd(),
-            `tmp-social-card-${name}-${filename.replace(/[^\w.-]/g, '_')}.svg`
+            `tmp-social-card-${name}-${filename.replace(/[^\w.-]/g, '_')}.svg`,
         );
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(tmpSvg, rendered);
@@ -386,7 +415,7 @@ export default function socialCardPlugin(eleventyConfig, userOptions = {}) {
 
     const EMIT = 'emit';
 
-    eleventyConfig.addAsyncShortcode(shortcodeName, async function(arg1, arg2) {
+    eleventyConfig.addAsyncShortcode(shortcodeName, async function (arg1, arg2) {
         // Accept `emit` as the flag in either position:
         //   {% card %}                   → render, no output
         //   {% card "emit" %}            → render, return URL

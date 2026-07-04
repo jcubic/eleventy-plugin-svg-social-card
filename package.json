@@ -16,15 +16,25 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.js",
+    "test:e2e:coverage": "vitest run --config vitest.e2e.config.js --coverage",
     "coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "example:single": "cd examples/single   && npx eleventy --config=.eleventy.js",
     "example:multiple": "cd examples/multiple && npx eleventy --config=.eleventy.js"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.0.0",
+    "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
+    "prettier": "^3.9.4",
     "vitest": "^4.1.9"
   },
   "keywords": [

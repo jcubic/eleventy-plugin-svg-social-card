@@ -55,19 +55,19 @@ Create `src/card/social-card.svg` (1200×630 is the OG standard). Use Liquid
 // .eleventy.js
 import socialCard from 'eleventy-plugin-svg-social-card';
 
-export default function(eleventyConfig) {
-    eleventyConfig.addPlugin(socialCard, {
-        template: 'src/card/social-card.svg',
-        outputDir: '_site/img/social-cards',
-        urlPath: '/img/social-cards',
-        data(ctx) {
-            return {
-                title:  ctx.title,
-                author: ctx.author ?? 'Anonymous',
-                date:   new Date(ctx.date).toDateString(),
-            };
-        },
-    });
+export default function (eleventyConfig) {
+  eleventyConfig.addPlugin(socialCard, {
+    template: 'src/card/social-card.svg',
+    outputDir: '_site/img/social-cards',
+    urlPath: '/img/social-cards',
+    data(ctx) {
+      return {
+        title: ctx.title,
+        author: ctx.author ?? 'Anonymous',
+        date: new Date(ctx.date).toDateString(),
+      };
+    },
+  });
 }
 ```
 
@@ -116,29 +116,29 @@ a light card for static pages — pass a `cards` map instead of a single
 ```js
 // .eleventy.js
 eleventyConfig.addPlugin(socialCard, {
-    shortcode: 'card',            // default
-    cards: {
-        article: {
-            template: 'src/cards/article.svg',
-            outputDir: '_site/img/articles',
-            urlPath:   '/img/articles',
-            data(ctx) {
-                return {
-                    title:  ctx.title,
-                    author: ctx.author,
-                    date:   new Date(ctx.date).toDateString(),
-                };
-            },
-        },
-        pages: {
-            template: 'src/cards/page.svg',
-            outputDir: '_site/img/pages',
-            urlPath:   '/img/pages',
-            data(ctx) {
-                return { title: ctx.title, site: ctx.siteName };
-            },
-        },
+  shortcode: 'card', // default
+  cards: {
+    article: {
+      template: 'src/cards/article.svg',
+      outputDir: '_site/img/articles',
+      urlPath: '/img/articles',
+      data(ctx) {
+        return {
+          title: ctx.title,
+          author: ctx.author,
+          date: new Date(ctx.date).toDateString(),
+        };
+      },
     },
+    pages: {
+      template: 'src/cards/page.svg',
+      outputDir: '_site/img/pages',
+      urlPath: '/img/pages',
+      data(ctx) {
+        return { title: ctx.title, site: ctx.siteName };
+      },
+    },
+  },
 });
 ```
 
@@ -184,7 +184,7 @@ end-to-end projects.
 [Inkscape](https://inkscape.org/) is the recommended editor — SVG is its
 native file format, so there's no lossy export step and the `.svg` you commit
 is the same file you edit. Design at **1200×630** (the Open Graph standard)
-and save as *Plain SVG* (File → Save As → *Plain SVG (\*.svg)*). Plain SVG
+and save as _Plain SVG_ (File → Save As → _Plain SVG (\*.svg)_). Plain SVG
 drops Inkscape-specific metadata and keeps the file small.
 
 ### Re-open the file in a text editor after saving
@@ -193,7 +193,7 @@ This is easy to miss and will silently break your card:
 
 **Inkscape URL-encodes curly braces inside attribute values on save.**
 If you type `{{ path }}/avatars/{{ username }}.jpg` into an image's
-*Image Properties → URL* field, Inkscape saves it as:
+_Image Properties → URL_ field, Inkscape saves it as:
 
 ```xml
 xlink:href="%7B%7B%20path%20%7D%7D/avatars/%7B%7B%20username%20%7D%7D.jpg"
@@ -211,10 +211,10 @@ attributes that get encoded.
 
 A quick find-and-replace recipe:
 
-| Encoded                       | Replace with      |
-| ----------------------------- | ----------------- |
-| `%7B%7B%20`                   | `{{ `             |
-| `%20%7D%7D`                   | ` }}`             |
+| Encoded     | Replace with |
+| ----------- | ------------ |
+| `%7B%7B%20` | `{{ `        |
+| `%20%7D%7D` | ` }}`        |
 
 ### Why `foreignObject` + `<xhtml:div>` for the title
 
@@ -273,23 +273,23 @@ Inkscape's preview. It'll render correctly when the plugin screenshots it.
 
 ## Options
 
-| Option       | Type                           | Default                        | Description |
-| ------------ | ------------------------------ | ------------------------------ | ----------- |
-| `template`   | `string` **(required)**        | —                              | Path to the `.svg` template. |
-| `data`       | `function` **(required)**      | —                              | `(ctx, page) => {...}`. Returns the variables for the SVG. `ctx` is the page's template data; `page` is Eleventy's `page` object. |
-| `shortcode`  | `string`                       | `'card'`                       | Shortcode name. |
-| `enabled`    | `boolean` \| `({ runMode }) => boolean` | `true`                | Hard on/off switch for card generation. Pass `false`, or a predicate that receives Eleventy's run mode (`'build'`, `'watch'`, `'serve'`), to skip the headless-browser render entirely. See [Fast watch mode](#fast-watch-mode). |
-| `cache`      | `boolean`                      | `true`                          | Skip re-rendering a card when its rendered SVG is byte-for-byte identical to the last one written to the same path. The hash cache lives in memory and persists across `--watch`/`--serve` rebuilds, so only cards whose data or template actually changed get re-screenshotted. Set `false` to always render. See [Fast watch mode](#fast-watch-mode). |
-| `cards`      | `object` (see below)           | `null`                         | If present, register a multi-variant shortcode — each key is a card name, each value is a variant-scoped options object. Ignores top-level `template`/`data`/`outputDir`/etc. when set. |
-| `outputDir`  | `string`                       | `'_site/img/social-cards'`     | Where to write the PNG. |
-| `urlPath`    | `string`                       | `'/img/social-cards'`          | Public URL prefix (what the shortcode returns). |
-| `filename`   | `(page) => string`             | ``page => `${page.fileSlug}.png` `` | Output filename. |
-| `viewport`   | `{width, height}`              | `{1200, 630}`                  | Browser viewport for the screenshot. |
-| `delay`      | `number` (ms)                  | `100`                          | Pause after page load, so fonts settle. |
-| `escape`     | `boolean`                      | `true`                         | Auto XML-escape all values returned by `data()`. Disable if you need to inject raw markup. |
-| `browser`    | `async () => Browser`          | `null`                         | Optional factory for a custom Puppeteer `Browser` instance. Default launches with `headless: 'new'` and CI-safe flags (`--no-sandbox`, `--disable-dev-shm-usage`, `--disable-gpu`) and a 60s `protocolTimeout`. |
-| `launchOptions` | `object`                    | `{}`                           | Extra options merged into the default `puppeteer.launch()` call (ignored when `browser` is set). Use this to append args, raise `protocolTimeout`, set `executablePath`, etc. without replacing the factory. |
-| `concurrency` | `number`                      | `1`                            | Max number of Chromium tabs that render in parallel. Default `1` is sequential — the safest choice on CI, where parallel renders starve `/dev/shm` and stall `Page.captureScreenshot`. Raise it if you've profiled your build and your runner can cope. |
+| Option          | Type                                    | Default                             | Description                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `template`      | `string` **(required)**                 | —                                   | Path to the `.svg` template.                                                                                                                                                                                                                                                                                                                            |
+| `data`          | `function` **(required)**               | —                                   | `(ctx, page) => {...}`. Returns the variables for the SVG. `ctx` is the page's template data; `page` is Eleventy's `page` object.                                                                                                                                                                                                                       |
+| `shortcode`     | `string`                                | `'card'`                            | Shortcode name.                                                                                                                                                                                                                                                                                                                                         |
+| `enabled`       | `boolean` \| `({ runMode }) => boolean` | `true`                              | Hard on/off switch for card generation. Pass `false`, or a predicate that receives Eleventy's run mode (`'build'`, `'watch'`, `'serve'`), to skip the headless-browser render entirely. See [Fast watch mode](#fast-watch-mode).                                                                                                                        |
+| `cache`         | `boolean`                               | `true`                              | Skip re-rendering a card when its rendered SVG is byte-for-byte identical to the last one written to the same path. The hash cache lives in memory and persists across `--watch`/`--serve` rebuilds, so only cards whose data or template actually changed get re-screenshotted. Set `false` to always render. See [Fast watch mode](#fast-watch-mode). |
+| `cards`         | `object` (see below)                    | `null`                              | If present, register a multi-variant shortcode — each key is a card name, each value is a variant-scoped options object. Ignores top-level `template`/`data`/`outputDir`/etc. when set.                                                                                                                                                                 |
+| `outputDir`     | `string`                                | `'_site/img/social-cards'`          | Where to write the PNG.                                                                                                                                                                                                                                                                                                                                 |
+| `urlPath`       | `string`                                | `'/img/social-cards'`               | Public URL prefix (what the shortcode returns).                                                                                                                                                                                                                                                                                                         |
+| `filename`      | `(page) => string`                      | ``page => `${page.fileSlug}.png` `` | Output filename.                                                                                                                                                                                                                                                                                                                                        |
+| `viewport`      | `{width, height}`                       | `{1200, 630}`                       | Browser viewport for the screenshot.                                                                                                                                                                                                                                                                                                                    |
+| `delay`         | `number` (ms)                           | `100`                               | Pause after page load, so fonts settle.                                                                                                                                                                                                                                                                                                                 |
+| `escape`        | `boolean`                               | `true`                              | Auto XML-escape all values returned by `data()`. Disable if you need to inject raw markup.                                                                                                                                                                                                                                                              |
+| `browser`       | `async () => Browser`                   | `null`                              | Optional factory for a custom Puppeteer `Browser` instance. Default launches with `headless: 'new'` and CI-safe flags (`--no-sandbox`, `--disable-dev-shm-usage`, `--disable-gpu`) and a 60s `protocolTimeout`.                                                                                                                                         |
+| `launchOptions` | `object`                                | `{}`                                | Extra options merged into the default `puppeteer.launch()` call (ignored when `browser` is set). Use this to append args, raise `protocolTimeout`, set `executablePath`, etc. without replacing the factory.                                                                                                                                            |
+| `concurrency`   | `number`                                | `1`                                 | Max number of Chromium tabs that render in parallel. Default `1` is sequential — the safest choice on CI, where parallel renders starve `/dev/shm` and stall `Page.captureScreenshot`. Raise it if you've profiled your build and your runner can cope.                                                                                                 |
 
 ## Only show the meta tag for pages that actually have a card
 
@@ -315,8 +315,9 @@ If your tag naming is more elaborate — for example multi-language tags like
 article tag and use it inline:
 
 ```js
-eleventyConfig.addFilter('isArticle', (tags) =>
-    Array.isArray(tags) && tags.some(t => t.startsWith('articles_'))
+eleventyConfig.addFilter(
+  'isArticle',
+  tags => Array.isArray(tags) && tags.some(t => t.startsWith('articles_')),
 );
 ```
 
@@ -337,7 +338,7 @@ Two features address this — one automatic, one a manual override.
 ### The render cache (on by default)
 
 Every render is hashed by its **rendered SVG** — the exact bytes that would be
-screenshotted, which reflects both your `data()` values *and* the template
+screenshotted, which reflects both your `data()` values _and_ the template
 file. On a `--watch`/`--serve` rebuild, if a card's hash matches what was last
 written to that path (and the PNG still exists), the plugin **skips it
 entirely** — no temp file, no browser tab. The browser is also launched
@@ -360,10 +361,12 @@ during development), the `enabled` option is the hard off switch:
 
 ```js
 eleventyConfig.addPlugin(socialCard, {
-    template: 'src/card/social-card.svg',
-    // Only render cards on a full build; never during --watch / --serve.
-    enabled: ({ runMode }) => runMode === 'build',
-    data(ctx) { /* … */ },
+  template: 'src/card/social-card.svg',
+  // Only render cards on a full build; never during --watch / --serve.
+  enabled: ({ runMode }) => runMode === 'build',
+  data(ctx) {
+    /* … */
+  },
 });
 ```
 
@@ -438,14 +441,15 @@ Chromium:
 ```bash
 npm test            # unit suite, run once
 npm run test:watch  # unit suite, watch mode
-npm run coverage    # unit suite with a coverage report (coverage/lcov.info)
+npm run coverage    # unit suite with coverage (coverage/unit/lcov.info)
 ```
 
 The separate **E2E suite** launches a real headless Chromium and inspects the
 actual PNG output:
 
 ```bash
-npm run test:e2e
+npm run test:e2e            # E2E render checks
+npm run test:e2e:coverage   # ...with coverage (coverage/e2e/lcov.info)
 ```
 
 It proves the one thing a real browser gives you over `librsvg`/`resvg`:
@@ -456,8 +460,19 @@ the data changes the pixels. It deliberately does **not** diff against a
 committed baseline image: exact pixels depend on installed fonts, anti-aliasing
 and the Chromium version, so a baseline would be flaky across machines.
 
-CI runs both suites on every push and pull request, and publishes unit-test
-coverage to [Coveralls](https://coveralls.io/).
+### Linting and formatting
+
+```bash
+npm run lint          # ESLint
+npm run lint:fix      # ESLint with --fix
+npm run format        # Prettier, write
+npm run format:check  # Prettier, check only
+```
+
+CI runs ESLint, the Prettier check, and both test suites on every push and pull
+request. Because the unit suite (fake browser) and the E2E suite (real Chromium)
+cover complementary code paths, CI **merges the two coverage reports into one**
+and publishes the combined result to [Coveralls](https://coveralls.io/).
 
 ## License
 

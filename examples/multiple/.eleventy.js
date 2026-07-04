@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default function(eleventyConfig) {
+export default function (eleventyConfig) {
     eleventyConfig.addPlugin(socialCard, {
         shortcode: 'card',
         cards: {
@@ -14,9 +14,9 @@ export default function(eleventyConfig) {
                 urlPath: '/img/articles',
                 data(ctx) {
                     return {
-                        title:  ctx.title ?? 'Untitled article',
+                        title: ctx.title ?? 'Untitled article',
                         author: ctx.author ?? 'Anonymous',
-                        date:   new Date(ctx.date ?? Date.now()).toDateString(),
+                        date: new Date(ctx.date ?? Date.now()).toDateString(),
                     };
                 },
             },
@@ -27,18 +27,18 @@ export default function(eleventyConfig) {
                 data(ctx) {
                     return {
                         title: ctx.title ?? 'Untitled page',
-                        site:  ctx.siteName ?? 'example.com',
+                        site: ctx.siteName ?? 'example.com',
                     };
                 },
             },
         },
     });
 
-    eleventyConfig.addCollection('articles', (api) =>
-        api.getFilteredByGlob(__dirname + '/content/articles/*.md')
+    eleventyConfig.addCollection('articles', api =>
+        api.getFilteredByGlob(__dirname + '/content/articles/*.md'),
     );
-    eleventyConfig.addCollection('pages', (api) =>
-        api.getFilteredByGlob(__dirname + '/content/pages/*.md')
+    eleventyConfig.addCollection('pages', api =>
+        api.getFilteredByGlob(__dirname + '/content/pages/*.md'),
     );
 
     return {

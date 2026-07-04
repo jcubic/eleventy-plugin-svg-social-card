@@ -9,9 +9,10 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             include: ['src/**/*.js'],
-            // `lcov` produces coverage/lcov.info for Coveralls; `text` prints a
-            // summary in CI logs.
+            // `lcov` produces coverage/unit/lcov.info; the E2E suite writes to
+            // coverage/e2e/. CI concatenates both into one report for Coveralls.
             reporter: ['text', 'lcov'],
+            reportsDirectory: 'coverage/unit',
         },
     },
 });

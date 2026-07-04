@@ -6,44 +6,101 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
-    # Tests inject a fake browser, so there's no need to download Puppeteer's
-    # bundled Chromium during `npm ci`.
     env:
       PUPPETEER_SKIP_DOWNLOAD: 'true'
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-
       - run: npm ci
+      - name: ESLint
+        run: npm run lint
 
-      - name: Run tests with coverage
-        run: npm run coverage
-
-      - name: Publish coverage to Coveralls
-        uses: coverallsapp/github-action@v2
+  prettier:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          file: coverage/lcov.info
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Prettier check
+        run: npm run format:check
+
+  unit:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    # The unit suite injects a fake browser, so it doesn't need Chromium.
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Unit tests with coverage
+        run: npm run coverage
+      - name: Upload unit coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-coverage
+          path: coverage/unit/lcov.info
+          retention-days: 1
 
   e2e:
     runs-on: ubuntu-latest
-    # This job renders cards with real Chromium, so it installs Puppeteer's
-    # bundled browser (no PUPPETEER_SKIP_DOWNLOAD here).
+    needs: [lint]
+    # The E2E suite renders with real Chromium, so it installs the bundled
+    # browser (no PUPPETEER_SKIP_DOWNLOAD here).
     steps:
       - uses: actions/checkout@v7
-
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-
       - run: npm ci
+      - name: E2E tests with coverage
+        run: npm run test:e2e:coverage
+      - name: Upload E2E coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-coverage
+          path: coverage/e2e/lcov.info
+          retention-days: 1
 
-      - name: Run E2E render tests
-        run: npm run test:e2e
+  coverage:
+    runs-on: ubuntu-latest
+    needs: [unit, e2e]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download unit coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: unit-coverage
+          path: coverage/unit/
+      - name: Download E2E coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: e2e-coverage
+          path: coverage/e2e/
+      - name: Merge coverage reports
+        run: |
+          mkdir -p coverage/merged
+          # lcov records are additive: concatenating the unit and E2E reports
+          # lets Coveralls merge per-line hit counts into one combined result.
+          cat coverage/unit/lcov.info coverage/e2e/lcov.info > coverage/merged/lcov.info
+      - name: Publish combined coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage/merged/lcov.info

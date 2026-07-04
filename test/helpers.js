@@ -8,8 +8,13 @@ export function makeFakeConfig() {
     let shortcodeName;
     return {
         cfg: {
-            on(event, fn) { (handlers[event] ??= []).push(fn); },
-            addAsyncShortcode(name, fn) { shortcodeName = name; shortcode = fn; },
+            on(event, fn) {
+                (handlers[event] ??= []).push(fn);
+            },
+            addAsyncShortcode(name, fn) {
+                shortcodeName = name;
+                shortcode = fn;
+            },
             addFilter() {},
         },
         // Fire an Eleventy lifecycle event (e.g. 'eleventy.before').
@@ -20,7 +25,9 @@ export function makeFakeConfig() {
         call(page, ...args) {
             return shortcode.apply({ ctx: { environments: {} }, page }, args);
         },
-        get shortcodeName() { return shortcodeName; },
+        get shortcodeName() {
+            return shortcodeName;
+        },
     };
 }
 
@@ -36,7 +43,9 @@ export function makeFakeBrowser() {
                 return {
                     async setViewport() {},
                     async goto(url) {
-                        counters.svgs.push(await fs.readFile(url.replace('file://', ''), 'utf8'));
+                        counters.svgs.push(
+                            await fs.readFile(url.replace('file://', ''), 'utf8'),
+                        );
                     },
                     async screenshot({ path }) {
                         counters.screenshots++;
@@ -45,7 +54,9 @@ export function makeFakeBrowser() {
                     async close() {},
                 };
             },
-            process() { return { exitCode: 0 }; },
+            process() {
+                return { exitCode: 0 };
+            },
             async close() {},
         };
     };
