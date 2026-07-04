@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+.agent-shell/
+**/_site/
+package-lock.json
+CHANGELOG.md
+*.svg
+agent-*
