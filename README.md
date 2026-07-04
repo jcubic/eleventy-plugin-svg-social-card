@@ -2,6 +2,8 @@
 
 [![npm](https://img.shields.io/badge/npm-0.3.0-yellow.svg)](https://www.npmjs.com/package/eleventy-plugin-svg-social-card)
 [![github repo](https://img.shields.io/badge/github-repo-orange?logo=github)](https://github.com/jcubic/eleventy-plugin-svg-social-card)
+[![Tests](https://github.com/jcubic/eleventy-plugin-svg-social-card/actions/workflows/test.yml/badge.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/actions/workflows/test.yml)
+[![Coverage Status](https://coveralls.io/repos/github/jcubic/eleventy-plugin-svg-social-card/badge.svg?branch=master)](https://coveralls.io/github/jcubic/eleventy-plugin-svg-social-card?branch=master)
 [![LICENSE MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/jcubic/eleventy-plugin-svg-social-card/blob/master/LICENSE)
 
 Generate per-page social card images (Open Graph / Twitter card) for your
@@ -426,6 +428,20 @@ fonts are installed on the runner. Install the fonts your SVG uses:
 **`this.ctx.environments` is empty.** You called the shortcode from a
 template that isn't in the article's layout chain (e.g., a standalone
 partial). Move the call into the layout that renders the post body.
+
+## Development
+
+Tests use [Vitest](https://vitest.dev/). They inject a fake browser through the
+`browser` option, so the suite runs fast and needs no real Chromium.
+
+```bash
+npm test            # run once
+npm run test:watch  # watch mode
+npm run coverage    # run with a coverage report (coverage/lcov.info)
+```
+
+CI runs the suite on every push and pull request and publishes coverage to
+[Coveralls](https://coveralls.io/).
 
 ## License
 

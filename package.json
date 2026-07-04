@@ -13,11 +13,16 @@
     "LICENSE"
   ],
   "scripts": {
-    "example:single":   "cd examples/single   && npx eleventy --config=.eleventy.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "example:single": "cd examples/single   && npx eleventy --config=.eleventy.js",
     "example:multiple": "cd examples/multiple && npx eleventy --config=.eleventy.js"
   },
   "devDependencies": {
-    "@11ty/eleventy": "^3.0.0"
+    "@11ty/eleventy": "^3.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "vitest": "^4.1.9"
   },
   "keywords": [
     "eleventy",
